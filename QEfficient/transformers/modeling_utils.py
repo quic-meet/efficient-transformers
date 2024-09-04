@@ -29,6 +29,13 @@ from transformers.models.llama.modeling_llama import (
     LlamaModel,
     LlamaRMSNorm,
 )
+from transformers.models.gemma.modeling_gemma import (
+    GemmaAttention,
+    GemmaDecoderLayer,
+    GemmaForCausalLM,
+    GemmaModel,
+    GemmaRMSNorm,
+)
 from transformers.models.mistral.modeling_mistral import (
     MistralAttention,
     MistralDecoderLayer,
@@ -76,6 +83,12 @@ from .models.llama.modeling_llama import (
     QEffLlamaForCausalLM,
     QEffLlamaModel,
 )
+from .models.gemma.modeling_gemma import (
+    QEffGemmaAttention,
+    QEffGemmaDecoderLayer,
+    QEffGemmaForCausalLM,
+    QEffGemmaModel
+)
 from .models.mistral.modeling_mistral import (
     QEffMistralAttention,
     QEffMistralDecoderLayer,
@@ -107,6 +120,7 @@ ModelArchitectures = namedtuple("ModelArchitectures", ["architectures"])
 get_lists_of_cb_qeff_models = ModelArchitectures(
     [
         LlamaForCausalLM.__name__,
+        GemmaForCausalLM.__name__,
         MistralForCausalLM.__name__,
         MixtralForCausalLM.__name__,
         Starcoder2ForCausalLM.__name__,
@@ -128,6 +142,7 @@ qeff_supported_architectures = ModelArchitectures(
         MptForCausalLM.__name__,
         CodeGenForCausalLM.__name__,
         LlamaForCausalLM.__name__,
+        GemmaForCausalLM.__name__,
         MistralForCausalLM.__name__,
         MixtralForCausalLM.__name__,
         Phi3ForCausalLM.__name__,
@@ -156,6 +171,11 @@ TransformersToQEffModulesDict: Dict[Type[nn.Module], Type[nn.Module]] = {
     LlamaForCausalLM: QEffLlamaForCausalLM,
     LlamaDecoderLayer: QEffLlamaDecoderLayer,
     LlamaRMSNorm: CustomRMSNormAIC,
+    # Gemma model layers
+    GemmaModel: QEffGemmaModel,
+    GemmaAttention: QEffGemmaAttention,
+    GemmaForCausalLM: QEffGemmaForCausalLM,
+    GemmaDecoderLayer: QEffGemmaDecoderLayer,
     # MPT model layers
     MptAttention: QEffMptAttention,
     MptBlock: QEffMptBlock,
