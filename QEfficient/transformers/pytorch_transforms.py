@@ -21,6 +21,12 @@ from transformers.models.falcon.modeling_falcon import (
     FalconForCausalLM,
     FalconModel,
 )
+from transformers.models.gemma.modeling_gemma import (
+    GemmaAttention,
+    GemmaDecoderLayer,
+    GemmaForCausalLM,
+    GemmaModel,
+)
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention, GPT2Block, GPT2LMHeadModel, GPT2Model
 from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJBlock, GPTJForCausalLM, GPTJModel
 from transformers.models.llama.modeling_llama import (
@@ -29,13 +35,6 @@ from transformers.models.llama.modeling_llama import (
     LlamaForCausalLM,
     LlamaModel,
     LlamaRMSNorm,
-)
-from transformers.models.gemma.modeling_gemma import (
-    GemmaAttention,
-    GemmaDecoderLayer,
-    GemmaForCausalLM,
-    GemmaModel,
-    GemmaRMSNorm,
 )
 from transformers.models.mistral.modeling_mistral import (
     MistralAttention,
@@ -90,6 +89,12 @@ from QEfficient.transformers.models.falcon.modeling_falcon import (
     QEffFalconForCausalLM,
     QEffFalconModel,
 )
+from QEfficient.transformers.models.gemma.modeling_gemma import (
+    QEffGemmaAttention,
+    QEffGemmaDecoderLayer,
+    QEffGemmaForCausalLM,
+    QEffGemmaModel,
+)
 from QEfficient.transformers.models.gpt2.modeling_gpt2 import (
     QEffGPT2Attention,
     QEffGPT2Block,
@@ -107,12 +112,6 @@ from QEfficient.transformers.models.llama.modeling_llama import (
     QEffLlamaDecoderLayer,
     QEffLlamaForCausalLM,
     QEffLlamaModel,
-)
-from QEfficient.transformers.models.gemma.modeling_gemma import (
-    QEffGemmaAttention,
-    QEffGemmaDecoderLayer,
-    QEffGemmaForCausalLM,
-    QEffGemmaModel,
 )
 from QEfficient.transformers.models.mistral.modeling_mistral import (
     QEffMistralAttention,
@@ -192,7 +191,7 @@ class KVCacheTransform(ModuleMappingTransform):
         LlamaAttention: QEffLlamaAttention,
         LlamaModel: QEffLlamaModel,
         LlamaForCausalLM: QEffLlamaForCausalLM,
-        # Gemma 
+        # Gemma
         GemmaAttention: QEffGemmaAttention,
         GemmaModel: QEffGemmaModel,
         GemmaForCausalLM: QEffGemmaForCausalLM,
