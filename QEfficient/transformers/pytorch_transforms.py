@@ -26,6 +26,14 @@ from transformers.models.gemma.modeling_gemma import (
     GemmaDecoderLayer,
     GemmaForCausalLM,
     GemmaModel,
+    GemmaRMSNorm,
+)
+from transformers.models.gemma2.modeling_gemma2 import (
+    Gemma2Attention,
+    Gemma2DecoderLayer,
+    Gemma2ForCausalLM,
+    Gemma2Model,
+    Gemma2RMSNorm,
 )
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention, GPT2Block, GPT2LMHeadModel, GPT2Model
 from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJBlock, GPTJForCausalLM, GPTJModel
@@ -95,6 +103,12 @@ from QEfficient.transformers.models.gemma.modeling_gemma import (
     QEffGemmaForCausalLM,
     QEffGemmaModel,
 )
+from QEfficient.transformers.models.gemma2.modeling_gemma2 import (
+    QEffGemma2Attention,
+    QEffGemma2DecoderLayer,
+    QEffGemma2ForCausalLM,
+    QEffGemma2Model,
+)
 from QEfficient.transformers.models.gpt2.modeling_gpt2 import (
     QEffGPT2Attention,
     QEffGPT2Block,
@@ -160,6 +174,8 @@ from QEfficient.transformers.models.starcoder2.modeling_starcoder2 import (
 
 class CustomOpsTransform(ModuleMappingTransform):
     _module_mapping = {
+        GemmaRMSNorm: CustomRMSNormAIC,
+        Gemma2RMSNorm: CustomRMSNormAIC,
         LlamaRMSNorm: CustomRMSNormAIC,
         MistralRMSNorm: CustomRMSNormAIC,
         MixtralRMSNorm: CustomRMSNormAIC,
@@ -195,6 +211,10 @@ class KVCacheTransform(ModuleMappingTransform):
         GemmaAttention: QEffGemmaAttention,
         GemmaModel: QEffGemmaModel,
         GemmaForCausalLM: QEffGemmaForCausalLM,
+        # Gemma2
+        Gemma2Attention: QEffGemma2Attention,
+        Gemma2Model: QEffGemma2Model,
+        Gemma2ForCausalLM: QEffGemma2ForCausalLM,
         # Mistral
         MistralAttention: QEffMistralAttention,
         MistralModel: QEffMistralModel,
@@ -242,6 +262,8 @@ class CBTransform(KVCacheTransform):
         LlamaDecoderLayer: QEffLlamaDecoderLayer,
         # Gemma
         GemmaDecoderLayer: QEffGemmaDecoderLayer,
+        # Gemma2
+        Gemma2DecoderLayer: QEffGemma2DecoderLayer,
         # Mistral
         MistralDecoderLayer: QEffMistralDecoderLayer,
         # Mixtral
