@@ -7,6 +7,13 @@
 
 from QEfficient.customop.ctx_scatter_gather import CtxGatherFunc, CtxScatterFunc
 from QEfficient.customop.ctx_scatter_gather_cb import CtxGatherFuncCB, CtxScatterFuncCB
-from QEfficient.customop.rms_norm import CustomRMSNormAIC
+from QEfficient.customop.rms_norm import CustomRMSNormAIC, GemmaCustomRMSNormAIC
 
-__all__ = ["CtxGatherFunc", "CtxScatterFunc", "CustomRMSNormAIC", "CtxGatherFuncCB", "CtxScatterFuncCB"]
+__all__ = [
+    "CtxGatherFunc",
+    "CtxScatterFunc",
+    "CustomRMSNormAIC",
+    "GemmaCustomRMSNormAIC",
+    "CtxGatherFuncCB",
+    "CtxScatterFuncCB",
+]
