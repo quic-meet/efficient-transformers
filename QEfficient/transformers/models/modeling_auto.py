@@ -16,9 +16,10 @@ import QEfficient
 from QEfficient.base.modeling_qeff import QEFFBaseModel, Runtime
 from QEfficient.transformers.pytorch_transforms import CBTransform, CustomOpsTransform, KVCacheTransform
 from QEfficient.transformers.quantizers.auto import QEFF_AUTO_QUANTIZATION_CONFIG_MAPPING, with_replaced_quantizers
-from QEfficient.transformers.quantizers.quant_transforms import AwqToMatmulNbitsTransform, GPTQToMatmulNbitsTransform
+from QEfficient.transformers.quantizers.quant_transforms import AwqToMatmulNbitsTransform, GPTQToMatmulNbitsTransform, BitNetToMatmulNbitsTransform
 from QEfficient.transformers.quantizers.quantizer_awq import QEffAwqConfig
 from QEfficient.transformers.quantizers.quantizer_gptq import QEffGPTQConfig
+from QEfficient.transformers.quantizers.quantizer_bitnet import QEffBitNetConfig
 from QEfficient.utils import get_qpc_dir_path, load_hf_tokenizer
 from QEfficient.utils.constants import QEFF_MODELS_DIR
 from QEfficient.utils.logging_utils import logger
@@ -180,13 +181,16 @@ class QEFFAutoModelForCausalLM(QEFFTransformersBase):
             if KVCacheTransform not in self._pytorch_transforms:
                 raise RuntimeError("Please don't update _pytorch_transforms variable")
 
-        # Update list of pytorch transforms if the model falls in AWQ/GPTQ category
+        # Update list of pytorch transforms if the model falls in AWQ/GPTQ/BitNet category
         if hasattr(self.model.config, "quantization_config"):
             if isinstance(self.model.config.quantization_config, QEffAwqConfig):
                 self._pytorch_transforms.insert(0, AwqToMatmulNbitsTransform)
 
             if isinstance(self.model.config.quantization_config, QEffGPTQConfig):
                 self._pytorch_transforms.insert(0, GPTQToMatmulNbitsTransform)
+
+            if isinstance(self.model.config.quantization_config, QEffBitNetConfig):
+                self._pytorch_transforms.insert(0, BitNetToMatmulNbitsTransform)
 
         for transform in self._pytorch_transforms:
             transform.apply(self.model)

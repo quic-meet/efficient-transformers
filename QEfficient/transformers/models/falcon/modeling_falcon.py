@@ -26,7 +26,6 @@ from transformers.models.falcon.modeling_falcon import (
     FalconDecoderLayer,
     FalconForCausalLM,
     FalconModel,
-    _prepare_4d_causal_attention_mask_for_sdpa,
     apply_rotary_pos_emb,
     build_alibi_tensor,
     dropout_add,
@@ -307,7 +306,7 @@ class QEffFalconModel(FalconModel):
             # the manual implementation that requires a 4D causal mask in all
             # cases.
             if alibi is None:
-                attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
+                attention_mask = self._prepare_4d_causal_attention_mask_for_sdpa(
                     attention_mask,
                     (batch_size, seq_length),
                     inputs_embeds,

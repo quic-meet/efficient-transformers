@@ -10,7 +10,12 @@ import copy
 import torch
 from torch import nn
 from transformers.integrations.awq import AWQ_SCALES_MAPPINGS
+from transformers.utils import is_accelerate_available
+if is_accelerate_available():
+    from accelerate import init_empty_weights
 
+# For BitNet, the weights are ternary so can be represented with 2 bits, and they are packed in uint8 tensors, hence the number of values per item is 4
+BITNET_VALUES_PER_ITEM = 4
 
 class ScaledActivation(nn.Module):
     """
@@ -33,6 +38,172 @@ class ScaledActivation(nn.Module):
     def forward(self, x):
         return self.act(x) / self.scales.view(1, 1, -1).to(x.device)
 
+
+def unpack_weights_bitnet(packed: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """
+    Unpacks a tensor of quantized weights that were stored in a packed format using 2 bits per value.
+
+    Parameters:
+    -----------
+    packed : torch.Tensor
+        A tensor containing packed weights where each element represents 4 quantized values (using 2 bits per value).
+    dtype : torch.dtype
+        The dtype of the returned Tensor
+    Returns:
+    --------
+    torch.Tensor
+        A tensor of unpacked weights, where each value is converted from its packed 2-bit representation.
+
+    Example:
+    --------
+    packed = torch.tensor([[0b10100001, 0b00011000],
+                           [0b10010000, 0b00001010]], dtype=torch.uint8)
+
+    # Unpack the values
+    unpacked = unpack_weights(packed)
+
+    # Resulting unpacked tensor
+    print(unpacked)
+    # Output: tensor([[ 0, -1],
+                      [-1,  1],
+                      [-1,  1],
+                      [-1,  1],
+                      [ 1,  0],
+                      [ 0, -1],
+                      [ 1, -1],
+                      [ 1, -1]])
+
+    Explanation of the example:
+    ---------------------------
+    Let's take the first value for example 0b10100001, we we will only focus on the first column,
+    because every element is unpacked across the first dimension
+    - First 2 bits: `01` → 0 at [0][0]
+    - Second 2 bits: `00` → -1 at [0][2]
+    - Third 2 bits: `10` → 1 at [0][4]
+    - Fourth 2 bits: `10` → 1 at [0][6]
+    the second value of the same row (0b10010000) will give the values for [0][1], [0][3], [0][5], [0][7]
+
+    We subtract 1 because during the packing process, it's easier to work with values like 0, 1, and 2. To make this possible,
+    we add 1 to the original ternary weights (which are typically -1, 0, and 1) when packing them. When unpacking, we reverse
+    this by subtracting 1 to restore the original ternary values.
+    """
+    packed_shape = packed.shape
+
+    if len(packed_shape) == 1:
+        original_row_dim = packed_shape[0] * BITNET_VALUES_PER_ITEM
+        unpacked_shape = (original_row_dim,)
+    else:
+        original_row_dim = packed_shape[0] * BITNET_VALUES_PER_ITEM
+        unpacked_shape = (original_row_dim, *packed_shape[1:])
+
+    unpacked = torch.zeros(unpacked_shape, device=packed.device, dtype=torch.uint8)
+
+    for i in range(BITNET_VALUES_PER_ITEM):
+        start = i * packed_shape[0]
+        end = start + packed_shape[0]
+        mask = 3 << (2 * i)
+        unpacked[start:end] = (packed & mask) >> (2 * i)
+
+    return unpacked.to(dtype) - 1
+
+
+def _replace_with_bitnet_linear(
+    model,
+    target_cls=None,
+    modules_to_not_convert=None,
+    current_key_name=None,
+    quantization_config=None,
+    has_been_replaced=False,
+    pre_quantized=False,
+):
+    """
+    Private method that wraps the recursion for module replacement.
+
+    Returns the converted model and a boolean that indicates if the conversion has been successfull or not.
+    """
+
+    if current_key_name is None:
+        current_key_name = []
+
+    for name, module in model.named_children():
+        if current_key_name is None:
+            current_key_name = []
+        current_key_name.append(name)
+
+        # Check if the current key is not in the `modules_to_not_convert`
+        if not any(key in ".".join(current_key_name) for key in modules_to_not_convert):
+            with init_empty_weights():
+                if isinstance(module, nn.Linear) and name not in modules_to_not_convert:
+                    in_features = module.in_features
+                    out_features = module.out_features
+                    model._modules[name] = target_cls(
+                        in_features=in_features,
+                        out_features=out_features,
+                        bias=module.bias is not None,
+                        device=module.weight.device,
+                        dtype=module.weight.dtype,
+                    )
+                    has_been_replaced = True
+                    model._modules[name].requires_grad_(False)
+
+        if len(list(module.children())) > 0:
+            _, has_been_replaced = _replace_with_bitnet_linear(
+                module,
+                target_cls,
+                modules_to_not_convert=modules_to_not_convert,
+                current_key_name=current_key_name,
+                quantization_config=quantization_config,
+                has_been_replaced=has_been_replaced,
+            )
+        # Remove the last key for recursion
+        current_key_name.pop(-1)
+    return model, has_been_replaced
+
+def replace_with_bitnet_linear(
+    model,
+    target_cls=None,
+    modules_to_not_convert=None,
+    current_key_name=None,
+    quantization_config=None,
+    pre_quantized=False,
+):
+    """
+    A helper function to replace all `torch.nn.Linear` modules by `BitLinear158` modules`.
+
+    The function will be run recursively and replace all `torch.nn.Linear` modules except for the `lm_head` that should
+    be kept as a `torch.nn.Linear` module. The replacement is done under `init_empty_weights` context manager so no
+    CPU/GPU memory is required to run this function. Each weight will be quantized along the channel.
+
+    Parameters:
+        model (`torch.nn.Module`):
+            Input model or `torch.nn.Module` as the function is run recursively.
+        modules_to_not_convert (`List[`str`]`, *optional*, defaults to `["lm_head"]`):
+            Names of the modules to not convert in `EetqLinear`. In practice we keep the `lm_head` in full precision
+            for numerical stability reasons.
+        current_key_name (`List[`str`]`, *optional*):
+            An array to track the current key of the recursion. This is used to check whether the current key (part of
+            it) is not in the list of modules to not convert (for instances modules that are offloaded to `cpu` or
+            `disk`).
+    """
+    modules_to_not_convert = ["lm_head"] if modules_to_not_convert is None else modules_to_not_convert
+    if quantization_config and quantization_config.modules_to_not_convert is not None:
+        modules_to_not_convert.extend(quantization_config.modules_to_not_convert)
+    modules_to_not_convert = list(set(modules_to_not_convert))
+    model, has_been_replaced = _replace_with_bitnet_linear(
+        model,
+        target_cls,
+        modules_to_not_convert,
+        current_key_name,
+        quantization_config,
+        pre_quantized=pre_quantized,
+    )
+
+    if not has_been_replaced:
+        raise RuntimeWarning(
+            "You are loading your model using bitnet but no linear modules were found in your model."
+            "Please double check your model architecture, or submit an issue on github if you think this is a bug."
+        )
+    return model
 
 def get_keys_to_not_convert(model):
     """
